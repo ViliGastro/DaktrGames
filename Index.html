@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Čejs 27 – Rýchlejšie, 12 symbolov, ukazovatele dole</title>
+  <title>Čejs 27 – Nové symboly + jemný 3D efekt</title>
   <style>
     /* ZÁKLADNÉ POZADIE A PÍSMO */
     body {
@@ -24,8 +24,7 @@
       background: rgba(0, 0, 0, 0.8);
       border-radius: 15px;
       box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
-      position: relative; 
-      /* v relatívnom konte neskôr absolutely umiestnime info-bar */
+      position: relative;
     }
 
     /* NADPIS */
@@ -39,25 +38,28 @@
       margin-bottom: 20px;
     }
 
-    /* REŽIM SLOT MACHINE */
+    /* SLOT MACHINE LAYOUT s perspektívou pre 3D efekt */
     .slot-machine {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 5px; /* Minimálna medzera */
+      gap: 5px; 
       justify-content: center;
       margin: 20px 0;
+      perspective: 800px; /* Jemná perspektíva */
     }
 
-    /* KAŽDÝ VALec, 3 symboly viditeľné (3×200=600), ale celkovo 12 v kontajneri */
+    /* Každý valec */
     .reel {
       width: 200px;
-      height: 600px;
+      height: 600px; 
       overflow: hidden;
       background-color: #111;
       border: 3px solid #333;
       border-radius: 10px;
       box-shadow: inset 0 0 15px black;
       position: relative;
+      /* Umožní vnútorným prvkom točiť sa v 3D */
+      transform-style: preserve-3d;
     }
 
     .symbols {
@@ -66,6 +68,8 @@
       width: 100%;
       display: flex;
       flex-direction: column;
+      /* Pre istotu deklarujeme aj transform-origin */
+      transform-origin: center center;
     }
 
     /* Každý symbol 200×200 */
@@ -83,7 +87,7 @@
 
     /* Wild s minimalistickým fontom + rámčekom */
     .wildSymbol {
-      font-family: "Arial", sans-serif; 
+      font-family: "Arial", sans-serif;
       color: #00FFFF;
       font-weight: bold;
       border: 2px solid #fff;
@@ -144,11 +148,9 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      /* väčší text */
       font-size: 24px;
     }
     .credits, .bet {
-      /* prípadne pridať tieň textu, farbu, atď. */
       text-shadow: 0 0 5px #fff;
     }
   </style>
@@ -199,8 +201,9 @@
     let credits = 200;
     let betAmount = 10;
 
-    // Symboly (vrátane "Wild")
-    const allSymbols = ["🍒", "🍋", "🍇", "🍉", "⭐", "Wild"];
+    // Pridali sme dve nové symboly: "🔥" a "💰"
+    // Celkový zoznam:
+    const allSymbols = ["🍒", "🍋", "🍇", "🍉", "⭐", "Wild", "🔥", "💰"];
 
     // Pri načítaní stránky vygenerujeme 12 symbolov pre každý valec
     window.onload = () => {
@@ -254,7 +257,7 @@
       // Vymažeme všetko
       container.innerHTML = "";
 
-      // Najprv pridáme final3
+      // Najprv pridáme final3 (aktuálne "navrchu" pre nové točenie)
       final3.forEach(sym => container.appendChild(sym));
 
       // Potom vygenerujeme 9 nových
@@ -299,12 +302,13 @@
     /**
      * Animácia točenia (3 sekundy).
      * Posun: 0 -> -2400 px (12 symbolov × 200px).
+     * Okrem translateY pridáme aj jemné rotateX na vytvorenie 3D efektu.
      */
     function spinReelAnimation(reel, onComplete) {
       const symbolsContainer = reel.querySelector('.symbols');
       const startTime = performance.now();
       const duration = 3000;
-      const maxOffset = 2400; // 12×200 = 2400
+      const maxOffset = 2400;
 
       function animate(time) {
         let elapsed = time - startTime;
@@ -312,13 +316,24 @@
 
         const progress = elapsed / duration;
         const eased = easeInOutQuad(progress);
+
+        // Nastavíme pohyb zhora nadol
         const currentOffset = -maxOffset * eased;
-        symbolsContainer.style.transform = `translateY(${currentOffset}px)`;
+
+        // Jemné naklonenie, napr. max 10° okolo stredu
+        // Čím bližšie k 0.5, tým väčší uhol
+        const tiltAngle = 10 * (0.5 - Math.abs(progress - 0.5));
+
+        // Aplikujeme oboje
+        symbolsContainer.style.transform = `
+          translateY(${currentOffset}px)
+          rotateX(${tiltAngle}deg)
+        `;
 
         if (elapsed < duration) {
           requestAnimationFrame(animate);
         } else {
-          symbolsContainer.style.transform = `translateY(${-maxOffset}px)`;
+          symbolsContainer.style.transform = `translateY(${-maxOffset}px) rotateX(0deg)`;
           onComplete && onComplete();
         }
       }
@@ -333,8 +348,8 @@
     }
 
     /**
-     * Kontrola výhry (3 horizontálne + 2 diagonálne).
-     * Po skončení točenia sú "viditeľné" indexy 9..11 v .symbols (12 prvkov).
+     * Po skončení točenia sú "viditeľné" indexy 9..11 (spodné 3).
+     * Vyhodnocujeme 3 horizontálne línie + 2 diagonály.
      */
     function checkWin() {
       const reelSymbols = [];
@@ -385,8 +400,8 @@
     }
 
     /**
-     * Vráti násobok pre riadok, ak s1,s2,s3 sú rovnaké alebo Wild.
-     * Základ 2× stávka, za každý Wild ×2. Zvýrazní víťazné symboly.
+     * Ak sú symboly rovnaké alebo Wild (žolík), základ je 2× stávka,
+     * každý Wild navyšuje ×2. Zvýrazní víťazné symboly.
      */
     function checkLineAndGetMultiplier(el1, el2, el3) {
       const s1 = getSymbolText(el1);
@@ -411,8 +426,8 @@
     }
 
     /**
-     * Ak je <span class="wildSymbol">WILD</span>, vráti "Wild",
-     * inak vráti priamo text, napr. "🍒".
+     * getSymbolText(el): ak je <span class="wildSymbol">WILD</span>, vrátime "Wild",
+     * inak vrátime text (napr. "🍒" alebo "🔥").
      */
     function getSymbolText(el) {
       const span = el.querySelector('.wildSymbol');
@@ -420,6 +435,7 @@
       return el.textContent.trim();
     }
 
+    /** Odstráni zvýraznenie všetkých symbolov. */
     function removeAllHighlights() {
       reels.forEach((reel) => {
         reel.querySelectorAll('.symbol').forEach(sym => {
